@@ -71,22 +71,22 @@ function renderHome(){
   el("home-view").innerHTML=`
     <div class="hero">
       <h1>Your AI chats, together and private</h1>
-      <p class="sub">Bring your Claude, ChatGPT and Grok conversations into one place you own — search them, revisit them, and keep any of them going for free when you hit a limit. Nothing ever leaves your computer.</p>
+      <p class="sub">Bring your Claude, ChatGPT, Gemini and Grok conversations into one place you own — search them, revisit them, and keep any of them going for free when you hit a limit. Nothing ever leaves your computer.</p>
       <div class="choices">
         <div class="choice feature" id="c-paste">
           <span class="tag">Easiest</span>
           <div class="ti">⧉</div><h3>Paste a chat</h3>
-          <p>Copy a conversation from Claude, ChatGPT or Grok and paste it in.</p>
+          <p>Bring in a chat from Claude, ChatGPT, Gemini or Grok — guided, step by step.</p>
         </div>
         <div class="choice" id="c-upload">
           <div class="ti" style="margin-top:26px">↥</div><h3>Add from a file</h3>
-          <p>Upload the data export you downloaded from Claude or ChatGPT.</p>
+          <p>Have an export from Claude or ChatGPT? Import your whole history at once.</p>
         </div>
       </div>
       ${recents?`<div class="section-label">Recent chats</div>${recents}`:""}
     </div>`;
-  el("c-paste").onclick=openPaste;
-  el("c-upload").onclick=()=>el("file-input").click();
+  el("c-paste").onclick=openImport;
+  el("c-upload").onclick=openImport;
   document.querySelectorAll("#home-view .recent").forEach(n=>n.onclick=()=>openConversation(n.dataset.id));
 }
 
@@ -201,25 +201,75 @@ async function runAsk(q){
   });
 }
 
-/* ---------- add a chat (paste) ---------- */
-function openPaste(){
+/* ---------- add a chat: guided, provider-specific importer ---------- */
+const PROVIDERS = {
+  claude:{ name:"Claude", dot:"#d97757",
+    paste:["Open the conversation in Claude.","Click in the chat, select everything with Ctrl+A (⌘A on Mac), then copy with Ctrl+C (⌘C).","Paste it in the box below and click Add chat."],
+    file:{has:true, steps:["In Claude, click your name (bottom-left) → Settings.","Under Account, click “Export data” — Claude emails you a link (can take a few minutes).","Download the .zip, unzip it, then choose <b>conversations.json</b> below."]}},
+  chatgpt:{ name:"ChatGPT", dot:"#10a37f",
+    paste:["Open the conversation in ChatGPT.","Select all the messages with Ctrl+A (⌘A) and copy with Ctrl+C (⌘C).","Paste it in the box below and click Add chat."],
+    file:{has:true, steps:["In ChatGPT: Settings → Data controls → “Export data” → Export.","Check your email and download the .zip, then unzip it.","Choose <b>conversations.json</b> below."]}},
+  gemini:{ name:"Gemini", dot:"#4285f4",
+    paste:["Open the conversation in Gemini.","Select the messages and copy them (Ctrl+C / ⌘C).","Paste it in the box below and click Add chat."],
+    file:{has:true, note:"Gemini has no simple chat file, so pasting is easiest. If you’ve run a Google Takeout of “Gemini Apps”, you can choose that file below.", steps:["Optional: Google Takeout → select “Gemini Apps” → export, unzip, then choose the file below."]}},
+  grok:{ name:"Grok", dot:"#9aa0a6",
+    paste:["Open the conversation in Grok.","Select the messages and copy them (Ctrl+C / ⌘C).","Paste it in the box below and click Add chat."],
+    file:{has:false, note:"Grok doesn’t offer a chat file to download — pasting is the way to go."}},
+  other:{ name:"another app", dot:"#6ee7b7",
+    paste:["Open your conversation in the app.","Select all the text and copy it.","Paste it in the box below and click Add chat."],
+    file:{has:true, note:"Have a JSON export? Choose it below and Continuum will do its best to read it.", steps:["Choose your exported .json file below."]}},
+};
+let IMPORT_SOURCE="paste";
+
+function openImport(){
+  const tiles=Object.entries(PROVIDERS).map(([k,p])=>
+    `<button class="prov-tile" data-p="${k}"><span class="prov-dot" style="background:${p.dot}"></span><span>${esc(p.name)}</span></button>`).join("");
   el("paste-view").innerHTML=`
     <div class="hero"><h1>Add a chat</h1>
-      <p class="sub">Open a conversation in Claude, ChatGPT or Grok, select all of it, copy, and paste it below. (An exported file works too.)</p></div>
-    <input id="paste-title" class="textfield" placeholder="Give it a name (optional)"/>
-    <textarea id="paste-text" class="paste-text" placeholder="Paste your conversation here…"></textarea>
-    <div class="row-actions"><button class="btn primary" id="paste-go">Add it</button><button class="btn" id="paste-cancel">Cancel</button></div>`;
+      <p class="sub">Which app is this conversation from? Pick one and I’ll show you exactly how to bring it in.</p></div>
+    <div class="prov-grid">${tiles}</div>
+    <div class="muted" style="margin-top:16px;font-size:13px">Everything you import stays on your computer.</div>`;
   showView("paste");
-  el("paste-go").onclick=runPaste;
-  el("paste-cancel").onclick=()=>{ renderHome(); showView("home"); };
+  el("paste-view").querySelectorAll(".prov-tile").forEach(b=>b.onclick=()=>openImportProvider(b.dataset.p));
 }
+
+function openImportProvider(key){
+  const p=PROVIDERS[key]||PROVIDERS.other; IMPORT_SOURCE=key;
+  const steps=p.paste.map(x=>`<li>${x}</li>`).join("");
+  const f=p.file||{};
+  let fileHtml;
+  if(f.has){
+    fileHtml=`<h3>Or import your whole history</h3>${f.note?`<p class="imp-note">${f.note}</p>`:""}<ol class="imp-steps">${(f.steps||[]).map(x=>`<li>${x}</li>`).join("")}</ol><button class="btn" id="imp-file">Choose a file…</button>`;
+  } else {
+    fileHtml=`<h3>Import a file</h3><p class="imp-note">${f.note||"A file export isn’t available for this app — use Paste."}</p>`;
+  }
+  el("paste-view").innerHTML=`
+    <div class="hero"><h1>Add a chat from ${esc(p.name)}</h1></div>
+    <button class="btn" id="imp-back">← Choose a different app</button>
+    <div class="imp-grid">
+      <div class="panel">
+        <div class="imp-badge">Easiest · works for one chat</div>
+        <h3>Paste the conversation</h3>
+        <ol class="imp-steps">${steps}</ol>
+        <input id="paste-title" class="textfield" placeholder="Name this chat (optional)"/>
+        <textarea id="paste-text" class="paste-text" placeholder="Paste your conversation here…"></textarea>
+        <div class="row-actions"><button class="btn primary" id="paste-go">Add chat</button></div>
+      </div>
+      <div class="panel">${fileHtml}</div>
+    </div>`;
+  showView("paste");
+  el("imp-back").onclick=openImport;
+  el("paste-go").onclick=runPaste;
+  const fb=el("imp-file"); if(fb) fb.onclick=()=>el("file-input").click();
+}
+
 async function runPaste(){
   const text=(el("paste-text").value||"").trim(); if(!text){toast("Paste a conversation first");return;}
   const title=(el("paste-title").value||"").trim(); const go=el("paste-go"); go.disabled=true; go.textContent="Adding…";
-  try{ const d=await postJSON("/api/paste",{text,title}); await refreshConversations();
+  try{ const d=await postJSON("/api/paste",{text,title,source:IMPORT_SOURCE}); await refreshConversations();
     const id=d.conversation_ids&&d.conversation_ids[0];
     if(id){ openConversation(id); toast("Added."); } else toast("That chat is already here.");
-  }catch(e){ toast(e.message); } go.disabled=false; go.textContent="Add it";
+  }catch(e){ toast(e.message); } go.disabled=false; go.textContent="Add chat";
 }
 
 el("file-input").addEventListener("change",async e=>{
@@ -255,12 +305,12 @@ function renderOnboarding(){
     <div class="hero"><h1>Welcome to Continuum</h1>
       <p class="sub">A private home for all your AI chats. Let's bring in your first one — it stays on your computer.</p></div>
     <div class="choices">
-      <div class="choice feature" id="onb-paste"><span class="tag">Easiest</span><div class="ti">⧉</div><h3>Paste a chat</h3><p>Copy a conversation from Claude, ChatGPT or Grok and paste it in.</p></div>
-      <div class="choice" id="onb-upload"><div class="ti" style="margin-top:26px">↥</div><h3>Add from a file</h3><p>Upload a data export from Claude or ChatGPT.</p></div>
+      <div class="choice feature" id="onb-paste"><span class="tag">Easiest</span><div class="ti">⧉</div><h3>Paste a chat</h3><p>Bring in a chat from Claude, ChatGPT, Gemini or Grok — guided, step by step.</p></div>
+      <div class="choice" id="onb-upload"><div class="ti" style="margin-top:26px">↥</div><h3>Add from a file</h3><p>Import your whole history from a Claude or ChatGPT export.</p></div>
     </div>
     <div class="muted" style="margin-top:18px;font-size:13px">You can turn on free offline AI later (Settings ⚙) to keep chats going on your computer.</div>`;
-  el("onb-paste").onclick=openPaste;
-  el("onb-upload").onclick=()=>el("file-input").click();
+  el("onb-paste").onclick=openImport;
+  el("onb-upload").onclick=openImport;
   showView("onboarding");
 }
 
@@ -564,7 +614,7 @@ function memEditor(title, body, provenance){
 }
 
 /* ---------- nav ---------- */
-el("new-btn").addEventListener("click",openPaste);
+el("new-btn").addEventListener("click",openImport);
 el("compare-btn").addEventListener("click",openCompare);
 el("memory-btn").addEventListener("click",openMemory);
 function setNav(open){ document.body.classList.toggle("nav-open",open); el("scrim").hidden=!open; }

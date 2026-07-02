@@ -369,3 +369,20 @@ body {
 .bar-x { background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1;
   cursor: pointer; padding: 0 4px; }
 .bar-x:hover { color: var(--text); }
+
+/* ===== guided importer ===== */
+.prov-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-top: 22px; }
+.prov-tile { display: flex; align-items: center; gap: 10px; padding: 16px 18px; background: var(--panel-2); border: 1px solid var(--line);
+  border-radius: 12px; color: var(--text); font-size: 15px; font-weight: 500; cursor: pointer; transition: border-color .15s, transform .15s; }
+.prov-tile:hover { border-color: var(--accent-dim); transform: translateY(-1px); }
+.prov-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255,255,255,0.04); }
+.imp-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 16px; margin-top: 14px; align-items: start; }
+.imp-grid .panel h3 { margin: 0 0 10px; font-size: 15px; }
+.imp-badge { display: inline-block; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: var(--accent);
+  border: 1px solid var(--accent-dim); border-radius: 999px; padding: 3px 10px; margin-bottom: 10px; }
+.imp-steps { margin: 0 0 14px; padding-left: 20px; color: var(--text); }
+.imp-steps li { margin: 7px 0; line-height: 1.5; font-size: 13.5px; }
+.imp-steps b { color: var(--accent); font-weight: 600; }
+.imp-note { color: var(--muted); font-size: 13px; line-height: 1.5; margin: 0 0 12px; }
+.imp-grid .paste-text { min-height: 150px; }
+@media (max-width: 720px){ .imp-grid { grid-template-columns: 1fr; } }
