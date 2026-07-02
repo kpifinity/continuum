@@ -1,0 +1,7 @@
+[
+  {"uuid":"c-001","name":"Designing SKI Memory","created_at":"2026-06-20T10:00:00Z",
+   "chat_messages":[
+     {"sender":"human","text":"Help me design SKI Memory using the SKI Framework. See https://skiframework.org","created_at":"2026-06-20T10:00:00Z"},
+     {"sender":"assistant","content":[{"type":"text","text":"We can use Ed25519 signing and a hash-chained ledger. Here is code:\n```python\nprint('hello')\n```"}],"created_at":"2026-06-20T10:01:00Z"}
+   ]}
+]

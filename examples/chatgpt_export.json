@@ -1,0 +1,7 @@
+[
+  {"title":"Vacation planning","conversation_id":"g-77","create_time":1718870400,
+   "mapping":{
+     "n1":{"message":{"author":{"role":"user"},"content":{"parts":["Plan a trip to Banff National Park in Alberta"]},"create_time":1718870400}},
+     "n2":{"message":{"author":{"role":"assistant"},"content":{"parts":["Banff is great. Visit Lake Louise and Moraine Lake."]},"create_time":1718870460,"metadata":{"model_slug":"gpt-4o"}}}
+   }}
+]

@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+packaging/Output/
+.venv/
+venv/
+.pytest_cache/
+
+# SKI Memory local data (never commit a user's store or keys)
+.ski_memory/
+*.key
+*.db
+
+# OS
+.DS_Store
+Thumbs.db

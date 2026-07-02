@@ -1,0 +1,15 @@
+name = "continuum-analytics"
+main = "worker.js"
+compatibility_date = "2024-11-01"
+
+# Custom route so pings land on your domain. Adjust the zone/pattern to taste,
+# or remove and use the *.workers.dev URL Cloudflare gives you.
+# routes = [{ pattern = "kpifinity.com/api/continuum/*", zone_name = "kpifinity.com" }]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "continuum_analytics"
+database_id = "PASTE_YOUR_D1_DATABASE_ID_HERE"
+
+# STATS_TOKEN guards the /stats endpoint. Set it as a secret, not here:
+#   npx wrangler secret put STATS_TOKEN

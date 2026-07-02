@@ -1,0 +1,4 @@
+{"title":"Quick question","messages":[
+  {"role":"user","content":"What is the SKI Framework?"},
+  {"role":"assistant","content":"A neuro-symbolic compliance framework by KpiFinity."}
+]}
