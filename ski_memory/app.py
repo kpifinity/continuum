@@ -57,6 +57,7 @@ class MemEditBody(BaseModel):
 class PasteBody(BaseModel):
     text: str
     title: str | None = None
+    source: str | None = None
 
 
 class BriefBody(BaseModel):
@@ -245,7 +246,7 @@ def create_app(config: Config | None = None) -> FastAPI:
     def paste_conversation(body: PasteBody) -> dict:
         if not body.text.strip():
             raise HTTPException(status_code=400, detail="Nothing pasted")
-        summary, ids = bridge.ingest_pasted(store, body.text, body.title)
+        summary, ids = bridge.ingest_pasted(store, body.text, body.title, body.source)
         kg.build_all(store)
         return {"summary": summary, "conversation_ids": ids, "counts": store.counts()}
 

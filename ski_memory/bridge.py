@@ -25,7 +25,7 @@ _INLINE = re.compile(r"^\s*(you|human|me|user|claude|assistant|chatgpt|gpt|ai)\s
 _USER_WORDS = {"you", "human", "me", "user", "prompt"}
 
 
-def parse_pasted(text: str, title: str | None = None) -> tuple[str, list[dict]]:
+def parse_pasted(text: str, title: str | None = None, source: str | None = None) -> tuple[str, list[dict]]:
     """Parse a pasted conversation. Returns (format, [conversation])."""
     text = text.strip()
     # If it looks like an export, reuse the JSON importers.
@@ -66,17 +66,18 @@ def parse_pasted(text: str, title: str | None = None) -> tuple[str, list[dict]]:
         msgs = [("user", text)]
 
     title = (title or "").strip() or "Pasted conversation"
-    cid = "paste:" + ingest._hash_id(title, text[:200], str(time.time()))
+    src = (source or "paste").strip().lower() or "paste"
+    cid = src + ":" + ingest._hash_id(title, text[:200], str(time.time()))
     conv = {
-        "id": cid, "source": "paste", "title": title, "created_at": time.time(),
+        "id": cid, "source": src, "title": title, "created_at": time.time(),
         "messages": [{"seq": i, "role": r, "model": None, "content": c,
                       "created_at": None} for i, (r, c) in enumerate(msgs)],
     }
     return "paste", [conv]
 
 
-def ingest_pasted(store, text: str, title: str | None = None) -> tuple[dict, list[str]]:
-    fmt, conversations = parse_pasted(text, title)
+def ingest_pasted(store, text: str, title: str | None = None, source: str | None = None) -> tuple[dict, list[str]]:
+    fmt, conversations = parse_pasted(text, title, source)
     return ingest.store_parsed(store, fmt, conversations, "pasted")
 
 
