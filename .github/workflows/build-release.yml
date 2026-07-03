@@ -1,7 +1,11 @@
 name: Build installers
 
-# Push a version tag (e.g. v0.1.0) or click "Run workflow" to build the
-# Windows installer AND the macOS app, and publish both to the tag's Release.
+# Push a version tag (e.g. v0.1.2) or click "Run workflow" to build the Windows
+# installer AND the macOS app and publish both to the tag's Release.
+#
+# Code signing is OPTIONAL and activates automatically when you add the matching
+# GitHub repo secrets (see SIGNING.md). Without secrets, builds still succeed —
+# macOS is ad-hoc signed (runs after "Open Anyway"), Windows is left unsigned.
 on:
   push:
     tags: ["v*"]
@@ -26,10 +30,31 @@ jobs:
         run: python -m pytest -q
       - name: Build Continuum.exe (PyInstaller)
         run: python packaging/build.py
+      - name: Sign Continuum.exe (if a certificate is configured)
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERT_PFX_BASE64) {
+            [IO.File]::WriteAllBytes("$env:RUNNER_TEMP\cert.pfx", [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+            $st = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+            & $st.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "dist\Continuum.exe"
+          } else { Write-Host "No WINDOWS_CERT_PFX_BASE64 secret - Continuum.exe left unsigned." }
       - name: Install Inno Setup
         run: choco install innosetup --no-progress -y
       - name: Compile installer
-        run: '& "C:\\Program Files (x86)\\Inno Setup 6\\ISCC.exe" packaging\\installer.iss'
+        run: '& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" packaging\installer.iss'
+      - name: Sign installer (if a certificate is configured)
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          if ($env:WINDOWS_CERT_PFX_BASE64) {
+            $st = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" | Sort-Object FullName -Descending | Select-Object -First 1
+            & $st.FullName sign /f "$env:RUNNER_TEMP\cert.pfx" /p $env:WINDOWS_CERT_PASSWORD /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 "packaging\Output\Continuum-Setup.exe"
+          } else { Write-Host "No cert - installer left unsigned." }
       - name: Publish to Release
         uses: softprops/action-gh-release@v2
         with:
@@ -55,11 +80,44 @@ jobs:
             --collect-submodules uvicorn --collect-submodules anyio \
             --hidden-import ski_memory \
             packaging/run_ski_memory.py
+      - name: Sign app (Developer ID if configured, else ad-hoc)
+        env:
+          MACOS_CERT_P12_BASE64: ${{ secrets.MACOS_CERT_P12_BASE64 }}
+          MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+        run: |
+          APP="dist/Continuum.app"
+          if [ -n "$MACOS_CERT_P12_BASE64" ]; then
+            echo "Signing with Developer ID…"
+            echo "$MACOS_CERT_P12_BASE64" | base64 --decode > /tmp/cert.p12
+            KC=/tmp/build.keychain
+            security create-keychain -p actions "$KC"
+            security default-keychain -s "$KC"
+            security unlock-keychain -p actions "$KC"
+            security import /tmp/cert.p12 -k "$KC" -P "$MACOS_CERT_PASSWORD" -T /usr/bin/codesign
+            security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k actions "$KC" >/dev/null
+            IDENTITY=$(security find-identity -v -p codesigning "$KC" | awk -F'"' 'NR==1{print $2}')
+            codesign --force --deep --options runtime --timestamp --sign "$IDENTITY" "$APP"
+            codesign --verify --deep --strict "$APP"
+          else
+            echo "No MACOS_CERT_P12_BASE64 secret — ad-hoc signing (app runs after 'Open Anyway')."
+            codesign --force --deep --sign - "$APP"
+          fi
       - name: Package .dmg
         run: |
-          hdiutil create -volname "Continuum" \
-            -srcfolder "dist/Continuum.app" -ov -format UDZO \
-            "dist/Continuum-macOS.dmg"
+          hdiutil create -volname "Continuum" -srcfolder "dist/Continuum.app" -ov -format UDZO "dist/Continuum-macOS.dmg"
+      - name: Notarize & staple (if configured)
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          if [ -n "$APPLE_ID" ]; then
+            echo "Notarizing with Apple…"
+            xcrun notarytool submit "dist/Continuum-macOS.dmg" --apple-id "$APPLE_ID" --team-id "$APPLE_TEAM_ID" --password "$APPLE_APP_PASSWORD" --wait
+            xcrun stapler staple "dist/Continuum-macOS.dmg"
+          else
+            echo "No APPLE_ID secret — skipping notarization."
+          fi
       - name: Publish to Release
         uses: softprops/action-gh-release@v2
         with:
